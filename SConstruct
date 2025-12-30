@@ -9,6 +9,16 @@ if not os.path.isdir("godot-cpp"):
     print("ERROR: Missing ./godot-cpp. Run: powershell -File scripts/fetch_deps.ps1")
     Exit(1)
 
+# Workaround for Windows MSVC: If building with MSVC and include paths are empty,
+# manually set them from the environment (which should be set by vcvarsall.bat)
+if os.name == 'nt':
+    include_env = os.environ.get('INCLUDE', '')
+    lib_env = os.environ.get('LIB', '')
+    if include_env:
+        os.environ['INCLUDE'] = include_env
+    if lib_env:
+        os.environ['LIB'] = lib_env
+
 # Build godot-cpp and reuse its configured env (platform/target/arch/etc).
 
 godot_env = SConscript("godot-cpp/SConstruct")
