@@ -1,0 +1,40 @@
+MidiPlayer Build Script (Windows)
+===================================
+
+Setting up MSVC environment...
+**********************************************************************
+** Visual Studio 2026 Developer Command Prompt v18.1.1
+** Copyright (c) 2025 Microsoft Corporation
+**********************************************************************
+[DEBUG:ext\vcvars.bat] Found potential v145 version file: 'Microsoft.VCToolsVersion.VC.14.50.18.0.txt'
+[DEBUG:ext\vcvars.bat] Testing v145 version file: 'Microsoft.VCToolsVersion.VC.14.50.18.0.txt'
+[vcvarsall.bat] Environment initialized for: 'x64'
+
+Verifying cl.exe...
+D:\Software\VisualStudio\18\Community\VC\Tools\MSVC\14.50.35717\bin\Hostx64\x64\cl.exe
+
+Building with MSVC (use_mingw=no)
+
+scons: Reading SConscript files ...
+
+scons: warning: No version of Visual Studio compiler found - C/C++ compilers most likely not set correctly
+File "D:\DEV\git\MidiPlayer\SConstruct", line 24, in <module>
+Auto-detected 8 CPU cores available for build parallelism. Using 7 cores by default. You can override it with the -j argument.
+Building for architecture x86_64 on platform windows
+
+scons: warning: No version of Visual Studio compiler found - C/C++ compilers most likely not set correctly
+File "D:\DEV\git\MidiPlayer\godot-cpp\tools\windows.py", line 123, in generate
+scons: done reading SConscript files.
+scons: Building targets ...
+scons: `godot-cpp\bin\libgodot-cpp.windows.template_debug.x86_64.lib' is up to date.
+Compiling shared src\register_types.cpp ...
+src\register_types.cpp(26): error C2039: 'GDExtensionInterface': is not a member of 'godot'
+src\register_types.cpp(9): note: see declaration of 'godot'
+src\register_types.cpp(26): error C4430: missing type specifier - int assumed. Note: C++ does not support default-int
+src\register_types.cpp(26): error C2143: syntax error: missing ',' before '*'
+src\register_types.cpp(29): error C2065: 'p_interface': undeclared identifier
+src\register_types.cpp(29): error C2065: 'p_library': undeclared identifier
+src\register_types.cpp(29): error C2065: 'p_initialization': undeclared identifier
+scons: *** [src\register_types.windows.template_debug.x86_64.obj] Error 2
+scons: building terminated because of errors.
+Build FAILED

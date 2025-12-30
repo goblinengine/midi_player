@@ -1,6 +1,9 @@
 #include "register_types.h"
 
+#include <gdextension_interface.h>
 #include <godot_cpp/godot.hpp>
+#include <godot_cpp/core/defs.hpp>
+#include <godot_cpp/core/class_db.hpp>
 
 #include "midi_player.h"
 
@@ -23,13 +26,13 @@ void uninitialize_midi_player_module(ModuleInitializationLevel p_level) {
 
 extern "C" {
 
-GDExtensionBool GDE_EXPORT midi_player_library_init(const GDExtensionInterface *p_interface,
+uint32_t GDE_EXPORT midi_player_library_init(const GDExtensionInterface *p_interface,
 		GDExtensionClassLibraryPtr p_library,
 		GDExtensionInitialization *p_initialization) {
 	godot::GDExtensionBinding::InitObject init_obj(p_interface, p_library, p_initialization);
 	init_obj.register_initializer(godot::initialize_midi_player_module);
 	init_obj.register_terminator(godot::uninitialize_midi_player_module);
-	init_obj.set_minimum_library_initialization_level(MODULE_INITIALIZATION_LEVEL_SCENE);
+	init_obj.set_minimum_library_initialization_level(godot::MODULE_INITIALIZATION_LEVEL_SCENE);
 	return init_obj.init();
 }
 

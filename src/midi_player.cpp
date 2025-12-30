@@ -10,8 +10,8 @@
 #include <godot_cpp/core/object.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
 
-#include "../thirdparty/TinySoundFont/tsf.h"
-#include "../thirdparty/TinySoundFont/tml.h"
+#include "../thirdparty/TinySoundFont-upstream/tsf.h"
+#include "../thirdparty/TinySoundFont-upstream/tml.h"
 
 namespace godot {
 
@@ -139,8 +139,7 @@ PackedByteArray MidiPlayer::_read_all_bytes(const String &p_path) {
 	}
 
 	out.resize(len);
-	PackedByteArray::Write w = out.write();
-	f->get_buffer(w.ptr(), len);
+	f->get_buffer(out.ptrw(), len);
 	return out;
 }
 
@@ -155,8 +154,7 @@ bool MidiPlayer::_load_soundfont_bytes(const PackedByteArray &p_bytes) {
 		sf = nullptr;
 	}
 
-	PackedByteArray::Read r = p_bytes.read();
-	sf = tsf_load_memory(r.ptr(), (int)p_bytes.size());
+	sf = tsf_load_memory(p_bytes.ptr(), (int)p_bytes.size());
 	if (!sf) {
 		UtilityFunctions::push_error("MidiPlayer: tsf_load_memory() failed.");
 		return false;
@@ -194,8 +192,7 @@ bool MidiPlayer::_load_midi_bytes(const PackedByteArray &p_bytes) {
 		midi = nullptr;
 	}
 
-	PackedByteArray::Read r = p_bytes.read();
-	midi = tml_load_memory(r.ptr(), (int)p_bytes.size());
+	midi = tml_load_memory(p_bytes.ptr(), (int)p_bytes.size());
 	if (!midi) {
 		UtilityFunctions::push_error("MidiPlayer: tml_load_memory() failed.");
 		return false;

@@ -48,14 +48,13 @@ public:
 	float get_length_seconds() const;
 	float get_playback_position_seconds() const;
 
-protected:
-	static void _bind_methods();
+	// Virtual methods (public for godot-cpp binding)
 	void _ready() override;
 	void _exit_tree() override;
-
-private:
 	void _process(double p_delta) override;
 
+protected:
+	static void _bind_methods();
 	void _ensure_audio_setup();
 	void _clear_audio_buffer();
 	void _reset_synth();
