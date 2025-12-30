@@ -37,7 +37,7 @@ sources = [
 
 env.AppendUnique(CPPPATH=[
     "src",
-    "thirdparty/TinySoundFont",
+    "lib/TinySoundFont",
 ])
 
 # Build output naming.
