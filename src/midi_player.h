@@ -8,6 +8,8 @@
 #include <godot_cpp/classes/node.hpp>
 #include <godot_cpp/templates/vector.hpp>
 
+#include "midi_resources.h"
+
 // TinySoundFont / TinyMidiLoader forward declarations.
 struct tsf;
 struct tml_message;
@@ -21,11 +23,11 @@ public:
 	MidiPlayer();
 	~MidiPlayer();
 
-	void set_soundfont_path(const String &p_path);
-	String get_soundfont_path() const;
+	void set_soundfont(const Ref<SoundFontResource> &p_resource);
+	Ref<SoundFontResource> get_soundfont() const;
 
-	void set_midi_path(const String &p_path);
-	String get_midi_path() const;
+	void set_midi(const Ref<MidiFileResource> &p_resource);
+	Ref<MidiFileResource> get_midi() const;
 
 	void set_loop(bool p_loop);
 	bool get_loop() const;
@@ -41,6 +43,15 @@ public:
 
 	void set_generator_buffer_length(float p_seconds);
 	float get_generator_buffer_length() const;
+
+	void set_audio_bus(const String &p_bus);
+	String get_audio_bus() const;
+
+	void set_use_separate_notes_bus(bool p_enable);
+	bool get_use_separate_notes_bus() const;
+
+	void set_notes_audio_bus(const String &p_bus);
+	String get_notes_audio_bus() const;
 
 	bool load_soundfont(const String &p_path);
 	bool load_midi(const String &p_path);
@@ -66,32 +77,47 @@ public:
 protected:
 	static void _bind_methods();
 	void _ensure_audio_setup();
+	void _ensure_notes_audio_setup();
 	void _clear_audio_buffer();
+	void _clear_notes_audio_buffer();
 	void _reset_synth();
+	void _reset_notes_synth();
 	bool _load_soundfont_bytes(const PackedByteArray &p_bytes);
+	bool _load_notes_soundfont_bytes(const PackedByteArray &p_bytes);
 	bool _load_midi_bytes(const PackedByteArray &p_bytes);
 	static PackedByteArray _read_all_bytes(const String &p_path);
 	void _apply_event(const tml_message *p_msg);
 	void _process_events_until_ms(uint32_t p_time_ms);
-	void _pump_audio();
+	void _pump_audio(bool p_process_events);
+	void _pump_notes_audio();
 
-	String soundfont_path;
-	String midi_path;
+	Ref<SoundFontResource> soundfont_resource;
+	Ref<MidiFileResource> midi_resource;
+	PackedByteArray soundfont_bytes_cache;
 
 	bool loop = false;
 	float volume = 1.0f; // linear gain
 	float midi_speed = 1.0f; // playback speed multiplier
 	float generator_buffer_length = 0.5f;
+	String audio_bus = "Master";
+	bool use_separate_notes_bus = false;
+	String notes_audio_bus = "Master";
 
 	// Godot audio output
 	AudioStreamPlayer *player = nullptr;
 	Ref<AudioStreamGenerator> generator;
 	Ref<AudioStreamPlayback> playback_base;
 	AudioStreamGeneratorPlayback *playback = nullptr; // borrowed from playback_base
+
+	AudioStreamPlayer *notes_player = nullptr;
+	Ref<AudioStreamGenerator> notes_generator;
+	Ref<AudioStreamPlayback> notes_playback_base;
+	AudioStreamGeneratorPlayback *notes_playback = nullptr; // borrowed from notes_playback_base
 	int sample_rate = 44100;
 
 	// Synth/midi
 	tsf *sf = nullptr;
+	tsf *notes_sf = nullptr;
 	tml_message *midi = nullptr;
 	tml_message *event_cursor = nullptr;
 
@@ -101,6 +127,7 @@ protected:
 
 	// Amount of audio already generated since play() in seconds.
 	double synth_time_sec = 0.0;
+	double notes_time_sec = 0.0;
 };
 
 } // namespace godot

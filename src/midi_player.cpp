@@ -31,16 +31,20 @@ MidiPlayer::~MidiPlayer() {
 		tsf_close(sf);
 		sf = nullptr;
 	}
+	if (notes_sf) {
+		tsf_close(notes_sf);
+		notes_sf = nullptr;
+	}
 }
 
 void MidiPlayer::_bind_methods() {
-	ClassDB::bind_method(D_METHOD("set_soundfont_path", "path"), &MidiPlayer::set_soundfont_path);
-	ClassDB::bind_method(D_METHOD("get_soundfont_path"), &MidiPlayer::get_soundfont_path);
-	ClassDB::add_property("MidiPlayer", PropertyInfo(Variant::STRING, "soundfont_path"), "set_soundfont_path", "get_soundfont_path");
+	ClassDB::bind_method(D_METHOD("set_soundfont", "resource"), &MidiPlayer::set_soundfont);
+	ClassDB::bind_method(D_METHOD("get_soundfont"), &MidiPlayer::get_soundfont);
+	ClassDB::add_property("MidiPlayer", PropertyInfo(Variant::OBJECT, "soundfont", PROPERTY_HINT_RESOURCE_TYPE, "SoundFontResource"), "set_soundfont", "get_soundfont");
 
-	ClassDB::bind_method(D_METHOD("set_midi_path", "path"), &MidiPlayer::set_midi_path);
-	ClassDB::bind_method(D_METHOD("get_midi_path"), &MidiPlayer::get_midi_path);
-	ClassDB::add_property("MidiPlayer", PropertyInfo(Variant::STRING, "midi_path"), "set_midi_path", "get_midi_path");
+	ClassDB::bind_method(D_METHOD("set_midi", "resource"), &MidiPlayer::set_midi);
+	ClassDB::bind_method(D_METHOD("get_midi"), &MidiPlayer::get_midi);
+	ClassDB::add_property("MidiPlayer", PropertyInfo(Variant::OBJECT, "midi", PROPERTY_HINT_RESOURCE_TYPE, "MidiFileResource"), "set_midi", "get_midi");
 
 	ClassDB::bind_method(D_METHOD("set_loop", "loop"), &MidiPlayer::set_loop);
 	ClassDB::bind_method(D_METHOD("get_loop"), &MidiPlayer::get_loop);
@@ -61,6 +65,18 @@ void MidiPlayer::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_generator_buffer_length"), &MidiPlayer::get_generator_buffer_length);
 	ClassDB::add_property("MidiPlayer", PropertyInfo(Variant::FLOAT, "generator_buffer_length", PROPERTY_HINT_RANGE, "0.05,2.0,0.01"), "set_generator_buffer_length", "get_generator_buffer_length");
 
+	ClassDB::bind_method(D_METHOD("set_audio_bus", "bus"), &MidiPlayer::set_audio_bus);
+	ClassDB::bind_method(D_METHOD("get_audio_bus"), &MidiPlayer::get_audio_bus);
+	ClassDB::add_property("MidiPlayer", PropertyInfo(Variant::STRING, "audio_bus"), "set_audio_bus", "get_audio_bus");
+
+	ClassDB::bind_method(D_METHOD("set_use_separate_notes_bus", "enable"), &MidiPlayer::set_use_separate_notes_bus);
+	ClassDB::bind_method(D_METHOD("get_use_separate_notes_bus"), &MidiPlayer::get_use_separate_notes_bus);
+	ClassDB::add_property("MidiPlayer", PropertyInfo(Variant::BOOL, "use_separate_notes_bus"), "set_use_separate_notes_bus", "get_use_separate_notes_bus");
+
+	ClassDB::bind_method(D_METHOD("set_notes_audio_bus", "bus"), &MidiPlayer::set_notes_audio_bus);
+	ClassDB::bind_method(D_METHOD("get_notes_audio_bus"), &MidiPlayer::get_notes_audio_bus);
+	ClassDB::add_property("MidiPlayer", PropertyInfo(Variant::STRING, "notes_audio_bus"), "set_notes_audio_bus", "get_notes_audio_bus");
+
 	ClassDB::bind_method(D_METHOD("load_soundfont", "path"), &MidiPlayer::load_soundfont);
 	ClassDB::bind_method(D_METHOD("load_midi", "path"), &MidiPlayer::load_midi);
 
@@ -79,22 +95,51 @@ void MidiPlayer::_bind_methods() {
 }
 
 void MidiPlayer::note_on(int p_preset_index, int p_key, float p_velocity) {
+	// Clamp velocity to 0.0-1.0 range
+	float vel = std::max(0.0f, std::min(1.0f, p_velocity));
+
+	if (use_separate_notes_bus) {
+		_ensure_notes_audio_setup();
+		if (!notes_sf) {
+			// Ensure we have a soundfont loaded (also fills soundfont_bytes_cache).
+			if (!sf) {
+				if (soundfont_resource.is_valid() && !soundfont_resource->get_data().is_empty()) {
+					_load_soundfont_bytes(soundfont_resource->get_data());
+				}
+			}
+			if (!soundfont_bytes_cache.is_empty()) {
+				_load_notes_soundfont_bytes(soundfont_bytes_cache);
+			}
+		}
+		if (!notes_sf) {
+			UtilityFunctions::push_warning("MidiPlayer: note_on called but no soundfont loaded.");
+			return;
+		}
+		tsf_note_on(notes_sf, p_preset_index, p_key, vel);
+		return;
+	}
+
 	_ensure_audio_setup();
 	if (!sf) {
-		if (!soundfont_path.is_empty()) {
-			load_soundfont(soundfont_path);
+		if (soundfont_resource.is_valid() && !soundfont_resource->get_data().is_empty()) {
+			_load_soundfont_bytes(soundfont_resource->get_data());
 		}
 		if (!sf) {
 			UtilityFunctions::push_warning("MidiPlayer: note_on called but no soundfont loaded.");
 			return;
 		}
 	}
-	// Clamp velocity to 0.0-1.0 range
-	float vel = std::max(0.0f, std::min(1.0f, p_velocity));
 	tsf_note_on(sf, p_preset_index, p_key, vel);
 }
 
 void MidiPlayer::note_off(int p_preset_index, int p_key) {
+	if (use_separate_notes_bus) {
+		if (!notes_sf) {
+			return;
+		}
+		tsf_note_off(notes_sf, p_preset_index, p_key);
+		return;
+	}
 	if (!sf) {
 		return;
 	}
@@ -102,6 +147,13 @@ void MidiPlayer::note_off(int p_preset_index, int p_key) {
 }
 
 void MidiPlayer::note_off_all() {
+	if (use_separate_notes_bus) {
+		if (!notes_sf) {
+			return;
+		}
+		tsf_note_off_all(notes_sf);
+		return;
+	}
 	if (!sf) {
 		return;
 	}
@@ -116,20 +168,36 @@ void MidiPlayer::_exit_tree() {
 	stop();
 }
 
-void MidiPlayer::set_soundfont_path(const String &p_path) {
-	soundfont_path = p_path;
+void MidiPlayer::set_soundfont(const Ref<SoundFontResource> &p_resource) {
+	soundfont_resource = p_resource;
+	if (soundfont_resource.is_valid()) {
+		const PackedByteArray bytes = soundfont_resource->get_data();
+		if (!bytes.is_empty()) {
+			_load_soundfont_bytes(bytes);
+			if (use_separate_notes_bus && notes_player) {
+				_ensure_notes_audio_setup();
+				_load_notes_soundfont_bytes(soundfont_bytes_cache);
+			}
+		}
+	}
 }
 
-String MidiPlayer::get_soundfont_path() const {
-	return soundfont_path;
+Ref<SoundFontResource> MidiPlayer::get_soundfont() const {
+	return soundfont_resource;
 }
 
-void MidiPlayer::set_midi_path(const String &p_path) {
-	midi_path = p_path;
+void MidiPlayer::set_midi(const Ref<MidiFileResource> &p_resource) {
+	midi_resource = p_resource;
+	if (midi_resource.is_valid()) {
+		const PackedByteArray bytes = midi_resource->get_data();
+		if (!bytes.is_empty()) {
+			_load_midi_bytes(bytes);
+		}
+	}
 }
 
-String MidiPlayer::get_midi_path() const {
-	return midi_path;
+Ref<MidiFileResource> MidiPlayer::get_midi() const {
+	return midi_resource;
 }
 
 void MidiPlayer::set_loop(bool p_loop) {
@@ -164,6 +232,9 @@ void MidiPlayer::set_volume(float p_volume) {
 	if (sf) {
 		tsf_set_volume(sf, volume);
 	}
+	if (notes_sf) {
+		tsf_set_volume(notes_sf, volume);
+	}
 }
 
 float MidiPlayer::get_volume() const {
@@ -175,10 +246,58 @@ void MidiPlayer::set_generator_buffer_length(float p_seconds) {
 	if (generator.is_valid()) {
 		generator->set_buffer_length(generator_buffer_length);
 	}
+	if (notes_generator.is_valid()) {
+		notes_generator->set_buffer_length(generator_buffer_length);
+	}
 }
 
 float MidiPlayer::get_generator_buffer_length() const {
 	return generator_buffer_length;
+}
+
+void MidiPlayer::set_audio_bus(const String &p_bus) {
+	audio_bus = p_bus;
+	if (player) {
+		player->set_bus(audio_bus);
+	}
+	if (!use_separate_notes_bus && notes_player) {
+		notes_player->set_bus(audio_bus);
+	}
+}
+
+String MidiPlayer::get_audio_bus() const {
+	return audio_bus;
+}
+
+void MidiPlayer::set_use_separate_notes_bus(bool p_enable) {
+	use_separate_notes_bus = p_enable;
+	if (!use_separate_notes_bus) {
+		if (notes_sf) {
+			tsf_note_off_all(notes_sf);
+			tsf_reset(notes_sf);
+		}
+		if (notes_player) {
+			notes_player->stop();
+			notes_player->set_bus(audio_bus);
+		}
+		notes_playback_base.unref();
+		notes_playback = nullptr;
+	}
+}
+
+bool MidiPlayer::get_use_separate_notes_bus() const {
+	return use_separate_notes_bus;
+}
+
+void MidiPlayer::set_notes_audio_bus(const String &p_bus) {
+	notes_audio_bus = p_bus;
+	if (notes_player) {
+		notes_player->set_bus(use_separate_notes_bus ? notes_audio_bus : audio_bus);
+	}
+}
+
+String MidiPlayer::get_notes_audio_bus() const {
+	return notes_audio_bus;
 }
 
 PackedByteArray MidiPlayer::_read_all_bytes(const String &p_path) {
@@ -209,12 +328,18 @@ bool MidiPlayer::_load_soundfont_bytes(const PackedByteArray &p_bytes) {
 		return false;
 	}
 
+	soundfont_bytes_cache = p_bytes;
+
 	if (sf) {
 		tsf_close(sf);
 		sf = nullptr;
 	}
+	if (notes_sf) {
+		tsf_close(notes_sf);
+		notes_sf = nullptr;
+	}
 
-	sf = tsf_load_memory(p_bytes.ptr(), (int)p_bytes.size());
+	sf = tsf_load_memory(soundfont_bytes_cache.ptr(), (int)soundfont_bytes_cache.size());
 	if (!sf) {
 		UtilityFunctions::push_error("MidiPlayer: tsf_load_memory() failed.");
 		return false;
@@ -236,6 +361,40 @@ bool MidiPlayer::_load_soundfont_bytes(const PackedByteArray &p_bytes) {
 		// Set center pan + full volume in TSF's MIDI controller space.
 		tsf_channel_midi_control(sf, ch, (int)TML_PAN_MSB, 64);
 		tsf_channel_midi_control(sf, ch, (int)TML_VOLUME_MSB, 127);
+	}
+
+	return true;
+}
+
+bool MidiPlayer::_load_notes_soundfont_bytes(const PackedByteArray &p_bytes) {
+	if (p_bytes.is_empty()) {
+		return false;
+	}
+
+	if (notes_sf) {
+		tsf_close(notes_sf);
+		notes_sf = nullptr;
+	}
+
+	notes_sf = tsf_load_memory(p_bytes.ptr(), (int)p_bytes.size());
+	if (!notes_sf) {
+		UtilityFunctions::push_error("MidiPlayer: notes tsf_load_memory() failed.");
+		return false;
+	}
+
+	sample_rate = (int)AudioServer::get_singleton()->get_mix_rate();
+	if (sample_rate <= 0) {
+		sample_rate = 44100;
+	}
+
+	tsf_set_output(notes_sf, TSF_STEREO_INTERLEAVED, sample_rate, 0.0f);
+	tsf_set_max_voices(notes_sf, 256);
+	tsf_set_volume(notes_sf, volume);
+
+	for (int ch = 0; ch < 16; ch++) {
+		tsf_channel_set_presetnumber(notes_sf, ch, 0, ch == 9);
+		tsf_channel_midi_control(notes_sf, ch, (int)TML_PAN_MSB, 64);
+		tsf_channel_midi_control(notes_sf, ch, (int)TML_VOLUME_MSB, 127);
 	}
 
 	return true;
@@ -267,13 +426,11 @@ bool MidiPlayer::_load_midi_bytes(const PackedByteArray &p_bytes) {
 }
 
 bool MidiPlayer::load_soundfont(const String &p_path) {
-	soundfont_path = p_path;
 	PackedByteArray bytes = _read_all_bytes(p_path);
 	return _load_soundfont_bytes(bytes);
 }
 
 bool MidiPlayer::load_midi(const String &p_path) {
-	midi_path = p_path;
 	PackedByteArray bytes = _read_all_bytes(p_path);
 	return _load_midi_bytes(bytes);
 }
@@ -282,6 +439,7 @@ void MidiPlayer::_ensure_audio_setup() {
 	if (!player) {
 		player = memnew(AudioStreamPlayer);
 		player->set_name("_MidiPlayerAudio");
+		player->set_bus(audio_bus);
 		add_child(player);
 	}
 
@@ -309,6 +467,37 @@ void MidiPlayer::_ensure_audio_setup() {
 	}
 }
 
+void MidiPlayer::_ensure_notes_audio_setup() {
+	if (!notes_player) {
+		notes_player = memnew(AudioStreamPlayer);
+		notes_player->set_name("_MidiPlayerNotesAudio");
+		notes_player->set_bus(use_separate_notes_bus ? notes_audio_bus : audio_bus);
+		add_child(notes_player);
+	}
+
+	sample_rate = (int)AudioServer::get_singleton()->get_mix_rate();
+	if (sample_rate <= 0) {
+		sample_rate = 44100;
+	}
+
+	if (!notes_generator.is_valid()) {
+		notes_generator.instantiate();
+		notes_generator->set_mix_rate(sample_rate);
+		notes_generator->set_buffer_length(generator_buffer_length);
+		notes_player->set_stream(notes_generator);
+	}
+
+	if (!notes_player->is_playing()) {
+		notes_player->play();
+	}
+
+	notes_playback_base = notes_player->get_stream_playback();
+	notes_playback = Object::cast_to<AudioStreamGeneratorPlayback>(notes_playback_base.ptr());
+	if (!notes_playback) {
+		UtilityFunctions::push_warning("MidiPlayer: Notes AudioStreamGeneratorPlayback not available yet.");
+	}
+}
+
 void MidiPlayer::_clear_audio_buffer() {
 	if (!playback) {
 		return;
@@ -320,6 +509,18 @@ void MidiPlayer::_clear_audio_buffer() {
 		player->play();
 		playback_base = player->get_stream_playback();
 		playback = Object::cast_to<AudioStreamGeneratorPlayback>(playback_base.ptr());
+	}
+}
+
+void MidiPlayer::_clear_notes_audio_buffer() {
+	if (!notes_playback) {
+		return;
+	}
+	if (notes_player) {
+		notes_player->stop();
+		notes_player->play();
+		notes_playback_base = notes_player->get_stream_playback();
+		notes_playback = Object::cast_to<AudioStreamGeneratorPlayback>(notes_playback_base.ptr());
 	}
 }
 
@@ -339,17 +540,32 @@ void MidiPlayer::_reset_synth() {
 	}
 }
 
+void MidiPlayer::_reset_notes_synth() {
+	if (!notes_sf) {
+		return;
+	}
+	tsf_reset(notes_sf);
+	tsf_set_output(notes_sf, TSF_STEREO_INTERLEAVED, sample_rate, 0.0f);
+	tsf_set_max_voices(notes_sf, 256);
+	tsf_set_volume(notes_sf, volume);
+	for (int ch = 0; ch < 16; ch++) {
+		tsf_channel_set_presetnumber(notes_sf, ch, 0, ch == 9);
+		tsf_channel_midi_control(notes_sf, ch, (int)TML_PAN_MSB, 64);
+		tsf_channel_midi_control(notes_sf, ch, (int)TML_VOLUME_MSB, 127);
+	}
+}
+
 void MidiPlayer::play() {
 	_ensure_audio_setup();
 
 	if (!sf) {
-		if (!soundfont_path.is_empty()) {
-			load_soundfont(soundfont_path);
+		if (soundfont_resource.is_valid() && !soundfont_resource->get_data().is_empty()) {
+			_load_soundfont_bytes(soundfont_resource->get_data());
 		}
 	}
 	if (!midi) {
-		if (!midi_path.is_empty()) {
-			load_midi(midi_path);
+		if (midi_resource.is_valid() && !midi_resource->get_data().is_empty()) {
+			_load_midi_bytes(midi_resource->get_data());
 		}
 	}
 
@@ -375,17 +591,27 @@ void MidiPlayer::stop() {
 	playing = false;
 	paused = false;
 	synth_time_sec = 0.0;
+	notes_time_sec = 0.0;
 	event_cursor = midi;
 
 	if (sf) {
 		tsf_note_off_all(sf);
 		tsf_reset(sf);
 	}
+	if (notes_sf) {
+		tsf_note_off_all(notes_sf);
+		tsf_reset(notes_sf);
+	}
 	if (player) {
 		player->stop();
 	}
+	if (notes_player) {
+		notes_player->stop();
+	}
 	playback_base.unref();
 	playback = nullptr;
+	notes_playback_base.unref();
+	notes_playback = nullptr;
 }
 
 void MidiPlayer::pause() {
@@ -464,7 +690,7 @@ void MidiPlayer::_process_events_until_ms(uint32_t p_time_ms) {
 	}
 }
 
-void MidiPlayer::_pump_audio() {
+void MidiPlayer::_pump_audio(bool p_process_events) {
 	if (!sf || !playback) {
 		return;
 	}
@@ -480,10 +706,11 @@ void MidiPlayer::_pump_audio() {
 	while (frames_available > 0) {
 		const int frames = std::min(frames_available, k_block_frames);
 		const double block_end_sec = synth_time_sec + (double)frames / (double)sample_rate;
-		// Apply midi_speed to convert real time to MIDI time
-		const uint32_t block_end_ms = (uint32_t)(block_end_sec * 1000.0 * midi_speed);
-
-		_process_events_until_ms(block_end_ms);
+		if (p_process_events) {
+			// Apply midi_speed to convert real time to MIDI time
+			const uint32_t block_end_ms = (uint32_t)(block_end_sec * 1000.0 * midi_speed);
+			_process_events_until_ms(block_end_ms);
+		}
 
 		if ((int)interleaved.size() < frames * 2) {
 			interleaved.resize((size_t)frames * 2);
@@ -504,8 +731,8 @@ void MidiPlayer::_pump_audio() {
 		synth_time_sec = block_end_sec;
 		frames_available -= frames;
 
-		// If we're past the MIDI length and there are no active voices, stop.
-		if (!event_cursor) {
+		// If we're past the MIDI length and there are no active voices, stop/loop.
+		if (p_process_events && !event_cursor) {
 			if (tsf_active_voice_count(sf) == 0) {
 				if (loop) {
 					play();
@@ -516,17 +743,69 @@ void MidiPlayer::_pump_audio() {
 	}
 }
 
-void MidiPlayer::_process(double p_delta) {
-	(void)p_delta;
-	if (!playing || paused) {
+void MidiPlayer::_pump_notes_audio() {
+	if (!notes_sf || !notes_playback) {
 		return;
 	}
-	_ensure_audio_setup();
-	_pump_audio();
 
-	// Auto-stop when finished (non-loop).
-	if (!loop && !event_cursor && sf && tsf_active_voice_count(sf) == 0) {
-		stop();
+	int frames_available = notes_playback->get_frames_available();
+	if (frames_available <= 0) {
+		return;
+	}
+
+	std::vector<float> interleaved;
+	interleaved.resize((size_t)k_block_frames * 2);
+
+	while (frames_available > 0) {
+		const int frames = std::min(frames_available, k_block_frames);
+		const double block_end_sec = notes_time_sec + (double)frames / (double)sample_rate;
+
+		if ((int)interleaved.size() < frames * 2) {
+			interleaved.resize((size_t)frames * 2);
+		}
+
+		tsf_render_float(notes_sf, interleaved.data(), frames, 0);
+
+		PackedVector2Array buf;
+		buf.resize(frames);
+		for (int i = 0; i < frames; i++) {
+			const float l = interleaved[i * 2 + 0];
+			const float r = interleaved[i * 2 + 1];
+			buf.set(i, Vector2(l, r));
+		}
+
+		notes_playback->push_buffer(buf);
+		notes_time_sec = block_end_sec;
+		frames_available -= frames;
+
+		if (tsf_active_voice_count(notes_sf) == 0) {
+			break;
+		}
+	}
+}
+
+void MidiPlayer::_process(double p_delta) {
+	(void)p_delta;
+	if (playing && !paused) {
+		_ensure_audio_setup();
+		_pump_audio(true);
+
+		// Auto-stop when finished (non-loop).
+		if (!loop && !event_cursor && sf && tsf_active_voice_count(sf) == 0) {
+			stop();
+		}
+	} else {
+		// Not playing (or paused): still render any manual notes on the main synth when not using a separate notes bus.
+		if (!use_separate_notes_bus && sf && tsf_active_voice_count(sf) > 0) {
+			_ensure_audio_setup();
+			_pump_audio(false);
+		}
+	}
+
+	// Separate notes bus output.
+	if (use_separate_notes_bus && notes_sf && tsf_active_voice_count(notes_sf) > 0) {
+		_ensure_notes_audio_setup();
+		_pump_notes_audio();
 	}
 }
 

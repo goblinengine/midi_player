@@ -28,6 +28,8 @@ env = godot_env.Clone()
 # Project sources
 sources = [
     "src/midi_player.cpp",
+    "src/midi_resources.cpp",
+    "src/midi_importers.cpp",
     "src/register_types.cpp",
     "src/thirdparty_tsf_tml.cpp",
 ]

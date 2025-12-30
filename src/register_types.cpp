@@ -5,14 +5,21 @@
 #include <godot_cpp/core/class_db.hpp>
 
 #include "midi_player.h"
+#include "midi_resources.h"
+#include "midi_importers.h"
 
 namespace godot {
 
 void initialize_midi_player_module(ModuleInitializationLevel p_level) {
-	if (p_level != MODULE_INITIALIZATION_LEVEL_SCENE) {
-		return;
+	if (p_level == MODULE_INITIALIZATION_LEVEL_SCENE) {
+		ClassDB::register_class<MidiFileResource>();
+		ClassDB::register_class<SoundFontResource>();
+		ClassDB::register_class<MidiPlayer>();
 	}
-	ClassDB::register_class<MidiPlayer>();
+	if (p_level == MODULE_INITIALIZATION_LEVEL_EDITOR) {
+		ClassDB::register_class<MidiImporter>();
+		ClassDB::register_class<SoundFontImporter>();
+	}
 }
 
 void uninitialize_midi_player_module(ModuleInitializationLevel p_level) {
