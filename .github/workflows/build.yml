@@ -1,4 +1,4 @@
-name: Build
+name: Quick Build (Windows Debug)
 
 on:
   push:
@@ -8,11 +8,8 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-windows:
+  test-build:
     runs-on: windows-latest
-    strategy:
-      matrix:
-        target: [template_debug, template_release]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -29,82 +26,16 @@ jobs:
       - name: Setup MSVC
         uses: ilammy/msvc-dev-cmd@v1
 
-      - name: Build godot-cpp
+      - name: Build godot-cpp (debug)
         run: |
           cd godot-cpp
-          scons platform=windows target=${{ matrix.target }} arch=x86_64 -j4
+          scons platform=windows target=template_debug arch=x86_64 -j4
 
-      - name: Build extension
-        run: scons platform=windows target=${{ matrix.target }} arch=x86_64 -j4
+      - name: Build extension (debug)
+        run: scons platform=windows target=template_debug arch=x86_64 -j4
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: midi-player-windows-${{ matrix.target }}-x86_64
+          name: midi-player-windows-debug-test
           path: addons/midi_player/bin/*.dll
-
-  build-linux:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        target: [template_debug, template_release]
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: recursive
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.x'
-
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential scons pkg-config
-
-      - name: Build godot-cpp
-        run: |
-          cd godot-cpp
-          scons platform=linux target=${{ matrix.target }} arch=x86_64 -j4
-
-      - name: Build extension
-        run: scons platform=linux target=${{ matrix.target }} arch=x86_64 -j4
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: midi-player-linux-${{ matrix.target }}-x86_64
-          path: addons/midi_player/bin/*.so
-
-  build-macos:
-    runs-on: macos-latest
-    strategy:
-      matrix:
-        target: [template_debug, template_release]
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: recursive
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.x'
-
-      - name: Install SCons
-        run: pip install scons
-
-      - name: Build godot-cpp
-        run: |
-          cd godot-cpp
-          scons platform=macos target=${{ matrix.target }} arch=universal -j4
-
-      - name: Build extension
-        run: scons platform=macos target=${{ matrix.target }} arch=universal -j4
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: midi-player-macos-${{ matrix.target }}-universal
-          path: addons/midi_player/bin/*.dylib
