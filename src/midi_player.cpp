@@ -10,8 +10,8 @@
 #include <godot_cpp/core/object.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
 
-#include "../thirdparty/TinySoundFont-upstream/tsf.h"
-#include "../thirdparty/TinySoundFont-upstream/tml.h"
+#include "../thirdparty/TinySoundFont/tsf.h"
+#include "../thirdparty/TinySoundFont/tml.h"
 
 namespace godot {
 
@@ -46,6 +46,13 @@ void MidiPlayer::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_loop"), &MidiPlayer::get_loop);
 	ClassDB::add_property("MidiPlayer", PropertyInfo(Variant::BOOL, "loop"), "set_loop", "get_loop");
 
+	ClassDB::bind_method(D_METHOD("set_looping", "looping"), &MidiPlayer::set_looping);
+	ClassDB::bind_method(D_METHOD("is_looping"), &MidiPlayer::is_looping);
+
+	ClassDB::bind_method(D_METHOD("set_midi_speed", "speed"), &MidiPlayer::set_midi_speed);
+	ClassDB::bind_method(D_METHOD("get_midi_speed"), &MidiPlayer::get_midi_speed);
+	ClassDB::add_property("MidiPlayer", PropertyInfo(Variant::FLOAT, "midi_speed", PROPERTY_HINT_RANGE, "0.1,4.0,0.01"), "set_midi_speed", "get_midi_speed");
+
 	ClassDB::bind_method(D_METHOD("set_volume", "volume"), &MidiPlayer::set_volume);
 	ClassDB::bind_method(D_METHOD("get_volume"), &MidiPlayer::get_volume);
 	ClassDB::add_property("MidiPlayer", PropertyInfo(Variant::FLOAT, "volume", PROPERTY_HINT_RANGE, "0.0,2.0,0.01"), "set_volume", "get_volume");
@@ -63,8 +70,42 @@ void MidiPlayer::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("resume"), &MidiPlayer::resume);
 	ClassDB::bind_method(D_METHOD("is_playing"), &MidiPlayer::is_playing);
 
+	ClassDB::bind_method(D_METHOD("note_on", "preset_index", "key", "velocity"), &MidiPlayer::note_on);
+	ClassDB::bind_method(D_METHOD("note_off", "preset_index", "key"), &MidiPlayer::note_off);
+	ClassDB::bind_method(D_METHOD("note_off_all"), &MidiPlayer::note_off_all);
+
 	ClassDB::bind_method(D_METHOD("get_length_seconds"), &MidiPlayer::get_length_seconds);
 	ClassDB::bind_method(D_METHOD("get_playback_position_seconds"), &MidiPlayer::get_playback_position_seconds);
+}
+
+void MidiPlayer::note_on(int p_preset_index, int p_key, float p_velocity) {
+	_ensure_audio_setup();
+	if (!sf) {
+		if (!soundfont_path.is_empty()) {
+			load_soundfont(soundfont_path);
+		}
+		if (!sf) {
+			UtilityFunctions::push_warning("MidiPlayer: note_on called but no soundfont loaded.");
+			return;
+		}
+	}
+	// Clamp velocity to 0.0-1.0 range
+	float vel = std::max(0.0f, std::min(1.0f, p_velocity));
+	tsf_note_on(sf, p_preset_index, p_key, vel);
+}
+
+void MidiPlayer::note_off(int p_preset_index, int p_key) {
+	if (!sf) {
+		return;
+	}
+	tsf_note_off(sf, p_preset_index, p_key);
+}
+
+void MidiPlayer::note_off_all() {
+	if (!sf) {
+		return;
+	}
+	tsf_note_off_all(sf);
 }
 
 void MidiPlayer::_ready() {
@@ -97,6 +138,25 @@ void MidiPlayer::set_loop(bool p_loop) {
 
 bool MidiPlayer::get_loop() const {
 	return loop;
+}
+
+void MidiPlayer::set_looping(bool p_looping) {
+	loop = p_looping;
+}
+
+bool MidiPlayer::is_looping() const {
+	return loop;
+}
+
+void MidiPlayer::set_midi_speed(float p_speed) {
+	if (p_speed <= 0.0f) {
+		p_speed = 1.0f;
+	}
+	midi_speed = p_speed;
+}
+
+float MidiPlayer::get_midi_speed() const {
+	return midi_speed;
 }
 
 void MidiPlayer::set_volume(float p_volume) {
@@ -420,7 +480,8 @@ void MidiPlayer::_pump_audio() {
 	while (frames_available > 0) {
 		const int frames = std::min(frames_available, k_block_frames);
 		const double block_end_sec = synth_time_sec + (double)frames / (double)sample_rate;
-		const uint32_t block_end_ms = (uint32_t)(block_end_sec * 1000.0);
+		// Apply midi_speed to convert real time to MIDI time
+		const uint32_t block_end_ms = (uint32_t)(block_end_sec * 1000.0 * midi_speed);
 
 		_process_events_until_ms(block_end_ms);
 

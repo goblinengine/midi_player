@@ -30,6 +30,12 @@ public:
 	void set_loop(bool p_loop);
 	bool get_loop() const;
 
+	void set_looping(bool p_looping);
+	bool is_looping() const;
+
+	void set_midi_speed(float p_speed);
+	float get_midi_speed() const;
+
 	void set_volume(float p_volume);
 	float get_volume() const;
 
@@ -44,6 +50,10 @@ public:
 	void pause();
 	void resume();
 	bool is_playing() const;
+
+	void note_on(int p_preset_index, int p_key, float p_velocity);
+	void note_off(int p_preset_index, int p_key);
+	void note_off_all();
 
 	float get_length_seconds() const;
 	float get_playback_position_seconds() const;
@@ -70,6 +80,7 @@ protected:
 
 	bool loop = false;
 	float volume = 1.0f; // linear gain
+	float midi_speed = 1.0f; // playback speed multiplier
 	float generator_buffer_length = 0.5f;
 
 	// Godot audio output

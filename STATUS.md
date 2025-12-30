@@ -20,7 +20,7 @@ MidiPlayer/
 │   └── thirdparty_tsf_tml.cpp   # TSF/TML compilation unit
 ├── godot-cpp/                   # Submodule (Godot 4.5)
 ├── thirdparty/
-│   └── TinySoundFont-upstream/  # Submodule (tsf.h, tml.h)
+│   └── TinySoundFont/  # Submodule (tsf.h, tml.h)
 ├── SConstruct                   # Build system
 ├── build.bat / build.ps1        # Windows build helpers
 └── BUILD.md                     # Detailed build instructions
