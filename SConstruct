@@ -2,11 +2,11 @@
 
 import os
 
-# This project expects godot-cpp to be available at ./godot-cpp
-# (either as a git submodule, or cloned via scripts/fetch_deps.ps1)
+# This project expects godot-cpp to be available at ../../godot-cpp
+# (shared at the root level as a git submodule)
 
-if not os.path.isdir("godot-cpp"):
-    print("ERROR: Missing ./godot-cpp. Run: powershell -File scripts/fetch_deps.ps1")
+if not os.path.isdir("../../godot-cpp"):
+    print("ERROR: Missing ../../godot-cpp. Ensure godot-cpp is set up at the repository root.")
     Exit(1)
 
 # Workaround for Windows MSVC: If building with MSVC and include paths are empty,
@@ -21,7 +21,7 @@ if os.name == 'nt':
 
 # Build godot-cpp and reuse its configured env (platform/target/arch/etc).
 
-godot_env = SConscript("godot-cpp/SConstruct")
+godot_env = SConscript("../../godot-cpp/SConstruct")
 
 env = godot_env.Clone()
 
@@ -30,6 +30,7 @@ sources = [
     "src/midi_player.cpp",
     "src/midi_resources.cpp",
     "src/midi_importers.cpp",
+    "src/midi_editor_plugin.cpp",
     "src/register_types.cpp",
     "src/thirdparty_tsf_tml.cpp",
 ]
@@ -49,7 +50,7 @@ suffix = env.get("suffix", "")
 lib_basename = "midi_player" + suffix
 
 # Emit into the addon bin folder so Godot can load it.
-out_dir = "addons/midi_player/bin"
+out_dir = "../../addons/midi_player/bin"
 
 # Ensure output dir exists.
 if not os.path.isdir(out_dir):

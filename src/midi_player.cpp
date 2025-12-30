@@ -67,7 +67,7 @@ void MidiPlayer::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("set_audio_bus", "bus"), &MidiPlayer::set_audio_bus);
 	ClassDB::bind_method(D_METHOD("get_audio_bus"), &MidiPlayer::get_audio_bus);
-	ClassDB::add_property("MidiPlayer", PropertyInfo(Variant::STRING, "audio_bus"), "set_audio_bus", "get_audio_bus");
+	ClassDB::add_property("MidiPlayer", PropertyInfo(Variant::STRING_NAME, "audio_bus"), "set_audio_bus", "get_audio_bus");
 
 	ClassDB::bind_method(D_METHOD("set_use_separate_notes_bus", "enable"), &MidiPlayer::set_use_separate_notes_bus);
 	ClassDB::bind_method(D_METHOD("get_use_separate_notes_bus"), &MidiPlayer::get_use_separate_notes_bus);
@@ -75,7 +75,7 @@ void MidiPlayer::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("set_notes_audio_bus", "bus"), &MidiPlayer::set_notes_audio_bus);
 	ClassDB::bind_method(D_METHOD("get_notes_audio_bus"), &MidiPlayer::get_notes_audio_bus);
-	ClassDB::add_property("MidiPlayer", PropertyInfo(Variant::STRING, "notes_audio_bus"), "set_notes_audio_bus", "get_notes_audio_bus");
+	ClassDB::add_property("MidiPlayer", PropertyInfo(Variant::STRING_NAME, "notes_audio_bus"), "set_notes_audio_bus", "get_notes_audio_bus");
 
 	ClassDB::bind_method(D_METHOD("load_soundfont", "path"), &MidiPlayer::load_soundfont);
 	ClassDB::bind_method(D_METHOD("load_midi", "path"), &MidiPlayer::load_midi);
@@ -255,7 +255,7 @@ float MidiPlayer::get_generator_buffer_length() const {
 	return generator_buffer_length;
 }
 
-void MidiPlayer::set_audio_bus(const String &p_bus) {
+void MidiPlayer::set_audio_bus(const StringName &p_bus) {
 	audio_bus = p_bus;
 	if (player) {
 		player->set_bus(audio_bus);
@@ -265,7 +265,7 @@ void MidiPlayer::set_audio_bus(const String &p_bus) {
 	}
 }
 
-String MidiPlayer::get_audio_bus() const {
+StringName MidiPlayer::get_audio_bus() const {
 	return audio_bus;
 }
 
@@ -289,14 +289,14 @@ bool MidiPlayer::get_use_separate_notes_bus() const {
 	return use_separate_notes_bus;
 }
 
-void MidiPlayer::set_notes_audio_bus(const String &p_bus) {
+void MidiPlayer::set_notes_audio_bus(const StringName &p_bus) {
 	notes_audio_bus = p_bus;
 	if (notes_player) {
 		notes_player->set_bus(use_separate_notes_bus ? notes_audio_bus : audio_bus);
 	}
 }
 
-String MidiPlayer::get_notes_audio_bus() const {
+StringName MidiPlayer::get_notes_audio_bus() const {
 	return notes_audio_bus;
 }
 
@@ -439,8 +439,9 @@ void MidiPlayer::_ensure_audio_setup() {
 	if (!player) {
 		player = memnew(AudioStreamPlayer);
 		player->set_name("_MidiPlayerAudio");
-		player->set_bus(audio_bus);
 		add_child(player);
+		// Set bus after adding to tree to ensure it takes effect
+		player->set_bus(audio_bus);
 	}
 
 	sample_rate = (int)AudioServer::get_singleton()->get_mix_rate();
@@ -471,8 +472,9 @@ void MidiPlayer::_ensure_notes_audio_setup() {
 	if (!notes_player) {
 		notes_player = memnew(AudioStreamPlayer);
 		notes_player->set_name("_MidiPlayerNotesAudio");
-		notes_player->set_bus(use_separate_notes_bus ? notes_audio_bus : audio_bus);
 		add_child(notes_player);
+		// Set bus after adding to tree
+		notes_player->set_bus(use_separate_notes_bus ? notes_audio_bus : audio_bus);
 	}
 
 	sample_rate = (int)AudioServer::get_singleton()->get_mix_rate();

@@ -3,10 +3,12 @@
 #include <godot_cpp/godot.hpp>
 #include <godot_cpp/core/defs.hpp>
 #include <godot_cpp/core/class_db.hpp>
+#include <godot_cpp/classes/editor_plugin_registration.hpp>
 
 #include "midi_player.h"
 #include "midi_resources.h"
 #include "midi_importers.h"
+#include "midi_editor_plugin.h"
 
 namespace godot {
 
@@ -19,12 +21,14 @@ void initialize_midi_player_module(ModuleInitializationLevel p_level) {
 	if (p_level == MODULE_INITIALIZATION_LEVEL_EDITOR) {
 		ClassDB::register_class<MidiImporter>();
 		ClassDB::register_class<SoundFontImporter>();
+		ClassDB::register_class<MidiEditorPlugin>();
+		EditorPlugins::add_by_type<MidiEditorPlugin>();
 	}
 }
 
 void uninitialize_midi_player_module(ModuleInitializationLevel p_level) {
-	if (p_level != MODULE_INITIALIZATION_LEVEL_SCENE) {
-		return;
+	if (p_level == MODULE_INITIALIZATION_LEVEL_EDITOR) {
+		EditorPlugins::remove_by_type<MidiEditorPlugin>();
 	}
 }
 

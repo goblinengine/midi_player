@@ -44,14 +44,14 @@ public:
 	void set_generator_buffer_length(float p_seconds);
 	float get_generator_buffer_length() const;
 
-	void set_audio_bus(const String &p_bus);
-	String get_audio_bus() const;
+	void set_audio_bus(const StringName &p_bus);
+	StringName get_audio_bus() const;
 
 	void set_use_separate_notes_bus(bool p_enable);
 	bool get_use_separate_notes_bus() const;
 
-	void set_notes_audio_bus(const String &p_bus);
-	String get_notes_audio_bus() const;
+	void set_notes_audio_bus(const StringName &p_bus);
+	StringName get_notes_audio_bus() const;
 
 	bool load_soundfont(const String &p_path);
 	bool load_midi(const String &p_path);
@@ -99,9 +99,9 @@ protected:
 	float volume = 1.0f; // linear gain
 	float midi_speed = 1.0f; // playback speed multiplier
 	float generator_buffer_length = 0.5f;
-	String audio_bus = "Master";
+	StringName audio_bus = "Master";
 	bool use_separate_notes_bus = false;
-	String notes_audio_bus = "Master";
+	StringName notes_audio_bus = "Master";
 
 	// Godot audio output
 	AudioStreamPlayer *player = nullptr;
