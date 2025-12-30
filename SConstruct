@@ -50,7 +50,7 @@ suffix = env.get("suffix", "")
 lib_basename = "midi_player" + suffix
 
 # Emit into the addon bin folder so Godot can load it.
-out_dir = "../../addons/midi_player/bin"
+out_dir = "../../godot_project/addons/midi_player/bin"
 
 # Ensure output dir exists.
 if not os.path.isdir(out_dir):

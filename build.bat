@@ -44,4 +44,4 @@ if errorlevel 1 (
 )
 
 echo Build succeeded!
-echo Output: addons\midi_player\bin\
+echo Output: godot_project\addons\midi_player\bin\
