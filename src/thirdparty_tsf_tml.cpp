@@ -7,5 +7,5 @@
 #define TML_IMPLEMENTATION
 #define TML_NO_STDIO
 
-#include "../thirdparty/TinySoundFont/tsf.h"
-#include "../thirdparty/TinySoundFont/tml.h"
+#include "../lib/TinySoundFont/tsf.h"
+#include "../lib/TinySoundFont/tml.h"

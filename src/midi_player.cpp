@@ -10,8 +10,8 @@
 #include <godot_cpp/core/object.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
 
-#include "../thirdparty/TinySoundFont/tsf.h"
-#include "../thirdparty/TinySoundFont/tml.h"
+#include "../lib/TinySoundFont/tsf.h"
+#include "../lib/TinySoundFont/tml.h"
 
 namespace godot {
 
